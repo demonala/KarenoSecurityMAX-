@@ -37,7 +37,7 @@ Open the **Termux** app on your Android device:
 pkg update -y && pkg install -y nodejs git termux-api
 
 # 2. Clone the Kareno repository
-git clone https://github.com/demonala/KarenoSecurityMAX-.git kareno
+git clone https://github.com/demonala/kareno.git
 cd kareno
 
 # 3. Run the mobile installer (symlinks kareno into $PREFIX/bin)
