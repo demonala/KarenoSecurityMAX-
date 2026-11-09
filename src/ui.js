@@ -4,21 +4,22 @@ const os = require('os');
 const { execSync } = require('child_process');
 
 const C = {
-  GREEN: '\x1b[38;2;0;255;115m',
-  AMBER: '\x1b[38;2;255;192;0m',
-  RED: '\x1b[38;2;255;42;84m',
-  CYAN: '\x1b[38;2;0;210;255m',
-  SLATE: '\x1b[38;2;115;140;130m',
-  DARK: '\x1b[38;2;40;55;48m',
-  WHITE: '\x1b[38;2;240;248;242m',
-  BG_DARK: '\x1b[48;2;8;12;10m',
+  GREEN: '\x1b[38;2;16;185;129m',    // Emerald #10b981
+  AMBER: '\x1b[38;2;245;158;11m',    // Warm Amber #f59e0b
+  RED: '\x1b[38;2;239;68;68m',       // Rose Red #ef4444
+  CYAN: '\x1b[38;2;6;182;212m',      // Electric Cyan #06b6d4
+  SLATE: '\x1b[38;2;100;116;139m',   // Muted Slate #64748b
+  DARK: '\x1b[38;2;51;65;85m',       // Subtle Border #334155
+  WHITE: '\x1b[38;2;241;245;249m',   // Crisp White #f1f5f9
+  MUTED: '\x1b[38;2;148;163;184m',   // Secondary Text #94a3b8
   BOLD: '\x1b[1m',
   DIM: '\x1b[2m',
   RESET: '\x1b[0m'
 };
 
 function getCols() {
-  return process.stdout.columns || 60;
+  const c = process.stdout.columns || 60;
+  return Math.max(38, Math.min(c, 80));
 }
 
 function isTermux() {
@@ -38,15 +39,15 @@ function fs_exists_safe(p) {
   }
 }
 
-function vibrateMobile(ms = 60) {
+function vibrateMobile(ms = 40) {
   try {
-    execSync(`termux-vibrate -d ${ms}`, { stdio: 'ignore', timeout: 500 });
+    execSync(`termux-vibrate -d ${ms}`, { stdio: 'ignore', timeout: 400 });
   } catch (_) {}
 }
 
 function toastMobile(message) {
   try {
-    execSync(`termux-toast "${message.replace(/"/g, '\\"')}"`, { stdio: 'ignore', timeout: 800 });
+    execSync(`termux-toast "${message.replace(/"/g, '\\"')}"`, { stdio: 'ignore', timeout: 600 });
   } catch (_) {}
 }
 
@@ -62,13 +63,13 @@ function getGitBranch() {
   try {
     const b = execSync('git rev-parse --abbrev-ref HEAD', {
       encoding: 'utf8',
-      timeout: 1000,
+      timeout: 800,
       stdio: ['pipe', 'pipe', 'ignore']
     }).trim();
     if (b) {
       const dirty = execSync('git status --porcelain', {
         encoding: 'utf8',
-        timeout: 1000,
+        timeout: 800,
         stdio: ['pipe', 'pipe', 'ignore']
       }).trim() ? '*' : '';
       return `${b}${dirty}`;
@@ -77,77 +78,68 @@ function getGitBranch() {
   return '';
 }
 
-function mobileBanner(config, quotaInfo, skillCount) {
+function cleanBanner(config, quotaInfo, skillCount) {
   const cols = getCols();
-  const width = Math.min(cols, 68);
-  const bar = '━'.repeat(Math.max(10, width - 4));
+  const rule = `${C.DARK}${'─'.repeat(Math.min(cols, 56))}${C.RESET}`;
   const branch = getGitBranch();
-  const branchTag = branch ? `${C.SLATE}·${C.RESET} ${C.AMBER}git:${branch}${C.RESET} ` : '';
+  const branchTag = branch ? `${C.SLATE}·${C.RESET} ${C.AMBER}git:${branch}${C.RESET}` : '';
   const isTx = isTermux();
-  const envBadge = isTx ? `${C.GREEN}TERMUX MOBILE${C.RESET}` : `${C.CYAN}MOBILE CLI${C.RESET}`;
+  const envBadge = isTx ? 'Termux ARM64' : 'Mobile CLI';
 
   const qPct = quotaInfo.dailyPercent.toFixed(0);
   const gauge = quotaGauge(quotaInfo.dailyPercent, 6);
   const provider = (config.provider || 'custom').toUpperCase();
   const model = config.model || 'unset';
-  const keyStatus = config.apiKeys && config.apiKeys[config.provider]
-    ? `${C.GREEN}CONNECTED${C.RESET}`
-    : `${C.AMBER}NO KEY (/key:set)${C.RESET}`;
+  const hasKey = config.apiKeys && config.apiKeys[config.provider];
+  const keyStatus = hasKey
+    ? `${C.GREEN}connected${C.RESET}`
+    : `${C.AMBER}no key (/key:set)${C.RESET}`;
 
   const cwd = process.cwd();
-  const shortCwd = cwd.length > 28 ? '...' + cwd.slice(-25) : cwd;
+  const shortCwd = cwd.length > 24 ? '...' + cwd.slice(-21) : cwd;
 
   return [
     '',
-    `${C.GREEN}  ┏━⟦ ${C.BOLD}${C.WHITE}KARENO${C.RESET} ${C.GREEN}⟧${C.DARK}${bar.slice(12)}┓${C.RESET}`,
-    `${C.GREEN}  ┃${C.RESET} ${C.BOLD}${C.WHITE}TACTICAL AUTONOMOUS CODE ENGINE${C.RESET} ${C.SLATE}// v1.0.0${C.RESET}`,
-    `${C.GREEN}  ┃${C.RESET} ${envBadge} ${C.SLATE}·${C.RESET} ${C.WHITE}100 COMMANDS${C.RESET} ${C.SLATE}·${C.RESET} ${C.CYAN}${skillCount} SKILLS${C.RESET}`,
-    `${C.GREEN}  ┣━⟦ ${C.BOLD}${C.WHITE}MODEL${C.RESET} ${C.GREEN}⟧${C.RESET} ${C.CYAN}${provider}${C.RESET}/${C.WHITE}${model}${C.RESET} ${C.SLATE}[${keyStatus}${C.SLATE}]${C.RESET}`,
-    `${C.GREEN}  ┣━⟦ ${C.BOLD}${C.WHITE}QUOTA${C.RESET} ${C.GREEN}⟧${C.RESET} ${gauge} ${C.WHITE}${qPct}%${C.RESET} ${C.SLATE}($${quotaInfo.dailyCost.toFixed(4)} / $${quotaInfo.dailyBudgetUsd.toFixed(2)})${C.RESET}`,
-    `${C.GREEN}  ┗━⟦ ${C.BOLD}${C.WHITE}PATH ${C.RESET} ${C.GREEN}⟧${C.RESET} ${C.WHITE}${shortCwd}${C.RESET} ${branchTag}`,
-    `  ${C.DARK}${bar}${C.RESET}`,
-    `  ${C.SLATE}Enter task or type ${C.CYAN}/help${C.SLATE} · ${C.CYAN}/model${C.SLATE} · ${C.CYAN}/quota${C.SLATE} · ${C.CYAN}/skills${C.RESET}`,
+    `  ${C.BOLD}${C.GREEN}K A R E N O${C.RESET}  ${C.SLATE}v1.0.0 · ${envBadge}${C.RESET}`,
+    `  ${C.MUTED}Autonomous Terminal Agent · BYOM & Quota Engine${C.RESET}`,
+    '',
+    `  ${C.SLATE}Engine${C.RESET}    ${C.WHITE}${model}${C.RESET} ${C.SLATE}(${provider})${C.RESET} ${keyStatus}`,
+    `  ${C.SLATE}Quota${C.RESET}     ${gauge} ${C.WHITE}${qPct}%${C.RESET} ${C.SLATE}($${quotaInfo.dailyCost.toFixed(4)} / $${quotaInfo.dailyBudgetUsd.toFixed(2)})${C.RESET}`,
+    `  ${C.SLATE}Context${C.RESET}   ${C.WHITE}${shortCwd}${C.RESET} ${branchTag} ${C.SLATE}· ${skillCount} skills${C.RESET}`,
+    `  ${rule}`,
+    `  ${C.MUTED}Type a task or ${C.CYAN}/help${C.MUTED} for 100 commands · ${C.CYAN}/model${C.MUTED} · ${C.CYAN}/quota${C.RESET}`,
     ''
   ].join('\n');
 }
 
 function promptLine(config, quotaInfo) {
-  const provider = (config.provider || 'none').toUpperCase();
   const model = (config.model || 'unset').split('/').pop();
   const qPct = quotaInfo.dailyPercent.toFixed(0);
-  const gauge = quotaGauge(quotaInfo.dailyPercent, 5);
-  const cwd = process.cwd().split(/[\\/]/).pop() || '~';
-  const branch = getGitBranch();
-  const branchPart = branch ? `━⟦${C.AMBER}${branch}${C.GREEN}⟧` : '';
-
-  return (
-    `\n${C.GREEN}┏━⟦${C.RESET}${C.BOLD}${C.WHITE}KARENO${C.RESET}${C.GREEN}⟧━⟦${C.RESET}${C.CYAN}${provider}:${model}${C.RESET}${C.GREEN}⟧━⟦${C.RESET}${gauge} ${C.WHITE}${qPct}%${C.RESET}${C.GREEN}⟧━⟦${C.RESET}${C.SLATE}${cwd}${C.RESET}${C.GREEN}⟧${branchPart}${C.RESET}\n` +
-    `${C.GREEN}┗━━▸${C.RESET} `
-  );
+  return `\n${C.SLATE}kareno${C.RESET} ${C.DARK}[${C.CYAN}${model}${C.DARK}·${C.MUTED}${qPct}%${C.DARK}]${C.RESET} ${C.GREEN}▸${C.RESET} `;
 }
 
 function spineBlock(title, rows, accent = C.GREEN) {
-  const out = [];
   const cols = getCols();
-  const maxKeyLen = Math.min(22, Math.floor(cols * 0.35));
-  out.push(`${accent}┏━⟦ ${C.BOLD}${C.WHITE}${title}${C.RESET}${accent} ⟧${C.RESET}`);
+  const ruleLen = Math.max(12, Math.min(cols, 56) - title.length - 6);
+  const header = `  ${C.DARK}──${C.RESET} ${C.BOLD}${C.WHITE}${title}${C.RESET} ${C.DARK}${'─'.repeat(Math.max(4, ruleLen))}${C.RESET}`;
+  const out = ['', header];
 
   for (let i = 0; i < rows.length; i++) {
-    const isLast = i === rows.length - 1;
-    const joint = isLast ? '┗━━▸' : '╟──▸';
     const row = rows[i];
     if (Array.isArray(row)) {
       const [k, v] = row;
       if (v === undefined) {
-        out.push(`${accent}${joint}${C.RESET} ${C.WHITE}${k}${C.RESET}`);
+        out.push(`  ${C.WHITE}${k}${C.RESET}`);
       } else {
-        const keyPadded = String(k).padEnd(maxKeyLen);
-        out.push(`${accent}${joint}${C.RESET} ${C.SLATE}${keyPadded}${C.RESET} ${C.WHITE}${v}${C.RESET}`);
+        const keyFormatted = `${C.MUTED}${String(k).padEnd(18)}${C.RESET}`;
+        out.push(`  ${keyFormatted} ${C.WHITE}${v}${C.RESET}`);
       }
     } else {
-      out.push(`${accent}${joint}${C.RESET} ${C.WHITE}${row}${C.RESET}`);
+      out.push(`  ${C.WHITE}${row}${C.RESET}`);
     }
   }
+
+  out.push(`  ${C.DARK}${'─'.repeat(Math.min(cols, 56))}${C.RESET}`);
   return out.join('\n');
 }
 
@@ -158,7 +150,7 @@ function toolStep(toolName, target, status = 'RUN', detail = '') {
   if (status === 'ERR') icon = `${C.RED}✖${C.RESET}`;
 
   const detailPart = detail ? ` ${C.SLATE}(${detail})${C.RESET}` : '';
-  return `  ${icon} ${C.BOLD}${C.WHITE}${toolName}${C.RESET} ${C.CYAN}${target}${C.RESET}${detailPart}`;
+  return `  ${icon} ${C.MUTED}${toolName}${C.RESET} ${C.WHITE}${target}${C.RESET}${detailPart}`;
 }
 
 function createSpinner(initialLabel = 'Thinking...') {
@@ -171,7 +163,7 @@ function createSpinner(initialLabel = 'Thinking...') {
   function render() {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     const frame = frames[idx % frames.length];
-    const text = `  ${C.GREEN}${frame}${C.RESET} ${C.WHITE}${currentLabel}${C.RESET} ${C.SLATE}(${elapsed}s)${C.RESET}`;
+    const text = `  ${C.GREEN}${frame}${C.RESET} ${C.MUTED}${currentLabel}${C.RESET} ${C.SLATE}${elapsed}s${C.RESET}`;
     try {
       process.stdout.write(`\r\x1b[K${text}`);
     } catch (_) {}
@@ -215,33 +207,37 @@ function formatMarkdown(content) {
       if (!inCodeBlock) {
         inCodeBlock = true;
         codeLang = line.trim().slice(3).trim();
-        formatted.push(`${C.DARK}┏━⟦ ${C.CYAN}${codeLang || 'CODE'}${C.RESET}${C.DARK} ⟧${'━'.repeat(24)}┓${C.RESET}`);
+        formatted.push(`  ${C.DARK}┌─ ${C.CYAN}${codeLang || 'code'}${C.RESET}`);
       } else {
         inCodeBlock = false;
-        formatted.push(`${C.DARK}┗${'━'.repeat(34)}┛${C.RESET}`);
+        formatted.push(`  ${C.DARK}└───────────────────────${C.RESET}`);
       }
       continue;
     }
 
     if (inCodeBlock) {
-      formatted.push(`${C.DARK}┃${C.RESET} ${C.WHITE}${line}${C.RESET}`);
+      formatted.push(`  ${C.DARK}│${C.RESET} ${C.WHITE}${line}${C.RESET}`);
       continue;
     }
 
     if (line.startsWith('# ')) {
-      formatted.push(`\n${C.GREEN}┏━⟦ ${C.BOLD}${C.WHITE}${line.slice(2).trim()}${C.RESET}${C.GREEN} ⟧${C.RESET}`);
+      formatted.push(`\n  ${C.BOLD}${C.GREEN}${line.slice(2).trim()}${C.RESET}\n`);
     } else if (line.startsWith('## ')) {
-      formatted.push(`\n${C.CYAN}╟──▸ ${C.BOLD}${C.WHITE}${line.slice(3).trim()}${C.RESET}`);
+      formatted.push(`\n  ${C.BOLD}${C.WHITE}${line.slice(3).trim()}${C.RESET}`);
     } else if (line.startsWith('### ')) {
-      formatted.push(`\n${C.AMBER}▸ ${C.BOLD}${C.WHITE}${line.slice(4).trim()}${C.RESET}`);
+      formatted.push(`  ${C.AMBER}${line.slice(4).trim()}${C.RESET}`);
     } else if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
       const indent = line.match(/^\s*/)[0];
       const bullet = line.trim().slice(2);
-      formatted.push(`${indent}  ${C.GREEN}▸${C.RESET} ${colorizeInline(bullet)}`);
+      formatted.push(`${indent}  ${C.GREEN}•${C.RESET} ${colorizeInline(bullet)}`);
     } else if (/^\d+\.\s/.test(line.trim())) {
-      formatted.push(`  ${C.CYAN}${line.trim().split('.')[0]}.${C.RESET} ${colorizeInline(line.trim().replace(/^\d+\.\s*/, ''))}`);
+      const num = line.trim().split('.')[0];
+      const rest = line.trim().replace(/^\d+\.\s*/, '');
+      formatted.push(`  ${C.CYAN}${num}.${C.RESET} ${colorizeInline(rest)}`);
+    } else if (!line.trim()) {
+      formatted.push('');
     } else {
-      formatted.push(colorizeInline(line));
+      formatted.push(`  ${colorizeInline(line)}`);
     }
   }
 
@@ -258,7 +254,7 @@ function renderDiff(filePath, oldText, newText) {
   const oldLines = (oldText || '').split('\n');
   const newLines = (newText || '').split('\n');
   const out = [];
-  out.push(`${C.CYAN}┏━⟦ DIFF // ${filePath} ⟧${C.RESET}`);
+  out.push(`  ${C.DARK}── Diff // ${filePath} ──${C.RESET}`);
 
   const maxLines = Math.max(oldLines.length, newLines.length);
   let shown = 0;
@@ -267,35 +263,34 @@ function renderDiff(filePath, oldText, newText) {
     const n = newLines[i];
     if (o !== n) {
       if (o !== undefined) {
-        out.push(`${C.RED}┃ - ${String(i + 1).padStart(3)} │ ${o.slice(0, 56)}${C.RESET}`);
+        out.push(`  ${C.RED}- ${String(i + 1).padStart(3)} │ ${o.slice(0, 52)}${C.RESET}`);
       }
       if (n !== undefined) {
-        out.push(`${C.GREEN}┃ + ${String(i + 1).padStart(3)} │ ${n.slice(0, 56)}${C.RESET}`);
+        out.push(`  ${C.GREEN}+ ${String(i + 1).padStart(3)} │ ${n.slice(0, 52)}${C.RESET}`);
       }
       shown++;
-      if (shown >= 18) {
-        out.push(`${C.SLATE}┃ ... (diff truncated for mobile)${C.RESET}`);
+      if (shown >= 16) {
+        out.push(`  ${C.SLATE}... (diff truncated for mobile)${C.RESET}`);
         break;
       }
     }
   }
   if (shown === 0) {
-    out.push(`${C.SLATE}┃ (No line differences)${C.RESET}`);
+    out.push(`  ${C.SLATE}(No line changes)${C.RESET}`);
   }
-  out.push(`${C.CYAN}┗━━▸ END DIFF${C.RESET}`);
   return out.join('\n');
 }
 
 function info(msg) {
-  console.log(`${C.GREEN}╟──▸${C.RESET} ${C.WHITE}${msg}${C.RESET}`);
+  console.log(`  ${C.GREEN}•${C.RESET} ${C.WHITE}${msg}${C.RESET}`);
 }
 
 function warn(msg) {
-  console.log(`${C.AMBER}╟─[!]▸${C.RESET} ${C.AMBER}${msg}${C.RESET}`);
+  console.log(`  ${C.AMBER}▲${C.RESET} ${C.AMBER}${msg}${C.RESET}`);
 }
 
 function error(msg) {
-  console.log(`${C.RED}╟─[ERR]▸${C.RESET} ${C.RED}${msg}${C.RESET}`);
+  console.log(`  ${C.RED}✖${C.RESET} ${C.RED}${msg}${C.RESET}`);
 }
 
 module.exports = {
@@ -305,7 +300,7 @@ module.exports = {
   vibrateMobile,
   toastMobile,
   quotaGauge,
-  headerBanner: mobileBanner,
+  headerBanner: cleanBanner,
   promptLine,
   spineBlock,
   toolStep,

@@ -56,17 +56,16 @@ kareno
 The full interactive terminal interface starts immediately:
 
 ```text
-  ┏━⟦ KARENO ⟧━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-  ┃ TACTICAL AUTONOMOUS CODE ENGINE // v1.0.0
-  ┃ TERMUX MOBILE · 100 COMMANDS · 4 SKILLS
-  ┣━⟦ MODEL ⟧ DEEPSEEK/deepseek-chat [CONNECTED]
-  ┣━⟦ QUOTA ⟧ ▱▱▱▱▱▱ 0% ($0.0000 / $5.00)
-  ┗━⟦ PATH  ⟧ ~/my-project · git:main*
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Enter task or type /help · /model · /quota · /skills
+  K A R E N O  v1.0.0 · Termux ARM64
+  Autonomous Terminal Agent · BYOM & Quota Engine
 
-┏━⟦KARENO⟧━⟦DEEPSEEK:deepseek-chat⟧━⟦▱▱▱▱▱ 0%⟧━⟦my-project⟧━⟦main*⟧
-┗━━▸ 
+  Engine    deepseek-chat (DEEPSEEK) connected
+  Quota     ▰▱▱▱▱▱ 2% ($0.0012 / $5.00 limit)
+  Context   ~/my-project · git:main* · 4 skills
+  ────────────────────────────────────────────────────────
+  Type a task or /help for 100 commands · /model · /quota
+
+kareno [deepseek-chat·2%] ▸ 
 ```
 
 ---
@@ -76,8 +75,10 @@ The full interactive terminal interface starts immediately:
 KARENO is Bring Your Own Model. Set your provider and key once from the interactive prompt:
 
 ```text
-┗━━▸ /provider:set deepseek
-┗━━▸ /key:set sk-your-deepseek-api-key
+kareno ▸ /provider:set deepseek
+kareno ▸ /key:set sk-your-deepseek-api-key
+kareno ▸ /model:set deepseek-chat
+```
 ┗━━▸ /model:set deepseek-chat
 ```
 

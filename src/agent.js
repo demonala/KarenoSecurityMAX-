@@ -121,8 +121,7 @@ function createAgentRuntime() {
       // If the model produced final content
       if (res.content && res.content.trim()) {
         spinner.stop();
-        console.log(`\n${C.GREEN}┏━⟦ ${C.BOLD}${C.WHITE}KARENO${C.RESET} ${C.GREEN}⟧${'━'.repeat(Math.max(10, UI.getCols() - 14))}┓${C.RESET}`);
-        console.log(UI.formatMarkdown(res.content.trim()));
+        console.log('\n' + UI.formatMarkdown(res.content.trim()));
       }
 
       // If no tool calls, task is finished
@@ -166,7 +165,7 @@ function createAgentRuntime() {
     const gauge = UI.quotaGauge(qInfo.dailyPercent, 5);
 
     console.log(
-      `${C.GREEN}┗━⟦ ${C.BOLD}${C.WHITE}COMPLETE${C.RESET}${C.GREEN} ⟧━⟦ ${C.SLATE}+${totalInTok + totalOutTok} tok · $${totalCost.toFixed(5)} · ${elapsedSec}s · ${gauge} ${qInfo.dailyPercent.toFixed(0)}%${C.GREEN} ⟧${C.RESET}`
+      `\n  ${C.DARK}─${C.RESET} ${C.SLATE}${elapsedSec}s · +${totalInTok + totalOutTok} tok ($${totalCost.toFixed(4)}) · Quota ${gauge} ${qInfo.dailyPercent.toFixed(0)}%${C.RESET}`
     );
 
     // Haptic feedback for mobile Termux
