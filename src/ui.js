@@ -4,12 +4,12 @@ const os = require('os');
 const { execSync } = require('child_process');
 
 const C = {
-  GREEN: '\x1b[38;2;16;185;129m',    // Emerald #10b981
+  CYAN: '\x1b[38;2;6;182;212m',      // Electric Cyan #06b6d4
+  GREEN: '\x1b[38;2;16;185;129m',    // Modern Emerald #10b981
   AMBER: '\x1b[38;2;245;158;11m',    // Warm Amber #f59e0b
   RED: '\x1b[38;2;239;68;68m',       // Rose Red #ef4444
-  CYAN: '\x1b[38;2;6;182;212m',      // Electric Cyan #06b6d4
   SLATE: '\x1b[38;2;100;116;139m',   // Muted Slate #64748b
-  DARK: '\x1b[38;2;51;65;85m',       // Subtle Border #334155
+  DARK: '\x1b[38;2;51;65;85m',       // Clean Border #334155
   WHITE: '\x1b[38;2;241;245;249m',   // Crisp White #f1f5f9
   MUTED: '\x1b[38;2;148;163;184m',   // Secondary Text #94a3b8
   BOLD: '\x1b[1m',
@@ -17,9 +17,21 @@ const C = {
   RESET: '\x1b[0m'
 };
 
+const OPENCODE_LOGO = [
+  " _                                ",
+  "| | ____ _ _ __ ___ _ __   ___    ",
+  "| |/ / _` | '__/ _ \\ '_ \\ / _ \\   ",
+  "|   < (_| | | |  __/ | | | (_) |  ",
+  "|_|\\_\\__,_|_|  \\___|_| |_|\\___/   "
+];
+
+function stripAnsi(str) {
+  return String(str || '').replace(/\x1b\[[0-9;]*m/g, '');
+}
+
 function getCols() {
   const c = process.stdout.columns || 60;
-  return Math.max(38, Math.min(c, 80));
+  return Math.max(38, Math.min(c, 76));
 }
 
 function isTermux() {
@@ -78,9 +90,9 @@ function getGitBranch() {
   return '';
 }
 
-function cleanBanner(config, quotaInfo, skillCount) {
+function headerBanner(config, quotaInfo, skillCount) {
   const cols = getCols();
-  const rule = `${C.DARK}${'─'.repeat(Math.min(cols, 56))}${C.RESET}`;
+  const boxWidth = Math.min(cols, 56);
   const branch = getGitBranch();
   const branchTag = branch ? `${C.SLATE}·${C.RESET} ${C.AMBER}git:${branch}${C.RESET}` : '';
   const isTx = isTermux();
@@ -96,50 +108,91 @@ function cleanBanner(config, quotaInfo, skillCount) {
     : `${C.AMBER}no key (/key:set)${C.RESET}`;
 
   const cwd = process.cwd();
-  const shortCwd = cwd.length > 24 ? '...' + cwd.slice(-21) : cwd;
+  const shortCwd = cwd.length > 22 ? '...' + cwd.slice(-19) : cwd;
+
+  const rows = [
+    ['Engine', `${model} (${provider})`, keyStatus],
+    ['Quota', `${gauge} ${qPct}% ($${quotaInfo.dailyCost.toFixed(4)} / $${quotaInfo.dailyBudgetUsd.toFixed(2)})`],
+    ['Context', `${shortCwd} ${branchTag}`, `${skillCount} skills`]
+  ];
+
+  const logoColored = OPENCODE_LOGO.map(l => `  ${C.CYAN}${l}${C.RESET}`).join('\n');
+  const box = spineBlock(`kareno v1.0.0 · ${envBadge}`, rows, C.CYAN, boxWidth);
 
   return [
     '',
-    `  ${C.BOLD}${C.GREEN}K A R E N O${C.RESET}  ${C.SLATE}v1.0.0 · ${envBadge}${C.RESET}`,
-    `  ${C.MUTED}Autonomous Terminal Agent · BYOM & Quota Engine${C.RESET}`,
-    '',
-    `  ${C.SLATE}Engine${C.RESET}    ${C.WHITE}${model}${C.RESET} ${C.SLATE}(${provider})${C.RESET} ${keyStatus}`,
-    `  ${C.SLATE}Quota${C.RESET}     ${gauge} ${C.WHITE}${qPct}%${C.RESET} ${C.SLATE}($${quotaInfo.dailyCost.toFixed(4)} / $${quotaInfo.dailyBudgetUsd.toFixed(2)})${C.RESET}`,
-    `  ${C.SLATE}Context${C.RESET}   ${C.WHITE}${shortCwd}${C.RESET} ${branchTag} ${C.SLATE}· ${skillCount} skills${C.RESET}`,
-    `  ${rule}`,
-    `  ${C.MUTED}Type a task or ${C.CYAN}/help${C.MUTED} for 100 commands · ${C.CYAN}/model${C.MUTED} · ${C.CYAN}/quota${C.RESET}`,
+    logoColored,
+    box,
+    `  ${C.MUTED}Type a task, or ${C.CYAN}/${C.MUTED} for 100 commands (/help, /model, /quota)${C.RESET}`,
     ''
   ].join('\n');
 }
 
 function promptLine(config, quotaInfo) {
-  const model = (config.model || 'unset').split('/').pop();
-  const qPct = quotaInfo.dailyPercent.toFixed(0);
-  return `\n${C.SLATE}kareno${C.RESET} ${C.DARK}[${C.CYAN}${model}${C.DARK}·${C.MUTED}${qPct}%${C.DARK}]${C.RESET} ${C.GREEN}▸${C.RESET} `;
+  return `${C.SLATE}kareno${C.RESET} ${C.CYAN}>${C.RESET} `;
 }
 
-function spineBlock(title, rows, accent = C.GREEN) {
+function spineBlock(title, rows, accent = C.CYAN, customWidth = 0) {
   const cols = getCols();
-  const ruleLen = Math.max(12, Math.min(cols, 56) - title.length - 6);
-  const header = `  ${C.DARK}──${C.RESET} ${C.BOLD}${C.WHITE}${title}${C.RESET} ${C.DARK}${'─'.repeat(Math.max(4, ruleLen))}${C.RESET}`;
-  const out = ['', header];
+  const targetWidth = customWidth > 0 ? customWidth : Math.min(cols, 64);
+  const titleClean = stripAnsi(title);
+  const topBarLen = Math.max(2, targetWidth - titleClean.length - 6);
+  const out = [];
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    if (Array.isArray(row)) {
-      const [k, v] = row;
-      if (v === undefined) {
-        out.push(`  ${C.WHITE}${k}${C.RESET}`);
-      } else {
-        const keyFormatted = `${C.MUTED}${String(k).padEnd(18)}${C.RESET}`;
-        out.push(`  ${keyFormatted} ${C.WHITE}${v}${C.RESET}`);
-      }
-    } else {
-      out.push(`  ${C.WHITE}${row}${C.RESET}`);
+  out.push(`  ${C.DARK}┌─${C.RESET} ${C.BOLD}${C.WHITE}${title}${C.RESET} ${C.DARK}${'─'.repeat(topBarLen)}┐${C.RESET}`);
+  const contentWidth = targetWidth - 4; // internal spacing between │ and │
+
+  // Find optimal key padding based on actual keys in this block
+  let maxKeyLen = 8;
+  for (const r of rows) {
+    if (Array.isArray(r) && r[0]) {
+      maxKeyLen = Math.max(maxKeyLen, stripAnsi(r[0]).length + 2);
     }
   }
+  maxKeyLen = Math.min(maxKeyLen, 13);
 
-  out.push(`  ${C.DARK}${'─'.repeat(Math.min(cols, 56))}${C.RESET}`);
+  for (const row of rows) {
+    let lineContent = '';
+    if (Array.isArray(row)) {
+      if (row.length === 3) {
+        // [Key, Val, RightTag]
+        const [k, v, tag] = row;
+        const keyPadded = String(k).padEnd(9);
+        const leftPart = `${C.SLATE}${keyPadded}${C.RESET} ${C.WHITE}${v}${C.RESET}`;
+        const rightPart = String(tag);
+        const usedLen = stripAnsi(leftPart).length + stripAnsi(rightPart).length;
+        const padLen = Math.max(1, contentWidth - usedLen);
+        lineContent = `${leftPart}${' '.repeat(padLen)}${rightPart}`;
+      } else {
+        const [k, v] = row;
+        if (v === undefined) {
+          lineContent = `${C.WHITE}${k}${C.RESET}`;
+        } else {
+          let keyStr = String(k);
+          let keyPadded = keyStr.length < maxKeyLen ? keyStr.padEnd(maxKeyLen) : keyStr + ' ';
+          let valStr = String(v);
+          const currentTotal = stripAnsi(keyPadded).length + stripAnsi(valStr).length;
+          if (currentTotal > contentWidth) {
+            const allowed = Math.max(8, contentWidth - stripAnsi(keyPadded).length - 3);
+            valStr = valStr.slice(0, allowed) + '..';
+          }
+          lineContent = `${C.SLATE}${keyPadded}${C.RESET}${C.WHITE}${valStr}${C.RESET}`;
+        }
+      }
+    } else {
+      let str = String(row);
+      if (stripAnsi(str).length > contentWidth) {
+        str = str.slice(0, contentWidth - 2) + '..';
+      }
+      lineContent = `${C.WHITE}${str}${C.RESET}`;
+    }
+
+    const visibleLen = stripAnsi(lineContent).length;
+    const rightPad = Math.max(0, contentWidth - visibleLen);
+    out.push(`  ${C.DARK}│${C.RESET} ${lineContent}${' '.repeat(rightPad)} ${C.DARK}│${C.RESET}`);
+  }
+
+  out.push(`  ${C.DARK}└${'─'.repeat(targetWidth - 2)}┘${C.RESET}`);
   return out.join('\n');
 }
 
@@ -163,7 +216,7 @@ function createSpinner(initialLabel = 'Thinking...') {
   function render() {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     const frame = frames[idx % frames.length];
-    const text = `  ${C.GREEN}${frame}${C.RESET} ${C.MUTED}${currentLabel}${C.RESET} ${C.SLATE}${elapsed}s${C.RESET}`;
+    const text = `  ${C.CYAN}${frame}${C.RESET} ${C.MUTED}${currentLabel}${C.RESET} ${C.SLATE}${elapsed}s${C.RESET}`;
     try {
       process.stdout.write(`\r\x1b[K${text}`);
     } catch (_) {}
@@ -300,7 +353,7 @@ module.exports = {
   vibrateMobile,
   toastMobile,
   quotaGauge,
-  headerBanner: cleanBanner,
+  headerBanner,
   promptLine,
   spineBlock,
   toolStep,
