@@ -170,6 +170,9 @@ async function callModel(config, systemPrompt, messages, enableTools = true) {
   const headers = {
     Authorization: `Bearer ${apiKey}`
   };
+  if (providerKey === 'gemini') {
+    headers['x-goog-api-key'] = apiKey;
+  }
   if (providerKey === 'openrouter') {
     headers['HTTP-Referer'] = 'https://github.com/demonala/kareno';
     headers['X-Title'] = 'Kareno CLI';

@@ -43,10 +43,10 @@ const PROVIDERS = {
   gemini: {
     name: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    defaultModel: 'gemini-2.5-pro',
-    models: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
+    defaultModel: 'gemini-2.5-flash',
+    models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
     envKey: 'GEMINI_API_KEY',
-    pricingPer1M: { input: 1.25, output: 5.00 }
+    pricingPer1M: { input: 0.15, output: 0.60 }
   },
   openrouter: {
     name: 'OpenRouter',
