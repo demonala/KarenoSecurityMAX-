@@ -1,0 +1,28 @@
+{
+  "name": "kareno-cli",
+  "version": "1.0.0",
+  "description": "KARENO // High-Velocity Autonomous Terminal Coding Agent for Termux & CLI. Bring Your Own Model, Quota Management, Skills Ecosystem, and 100 Native Commands.",
+  "main": "src/agent.js",
+  "bin": {
+    "kareno": "./bin/kareno.js"
+  },
+  "scripts": {
+    "start": "node ./bin/kareno.js",
+    "doctor": "node ./bin/kareno.js --cmd /doctor",
+    "help": "node ./bin/kareno.js --help"
+  },
+  "keywords": [
+    "kareno",
+    "termux",
+    "cli",
+    "coding-agent",
+    "ai-agent",
+    "byom",
+    "terminal"
+  ],
+  "author": "demonala // Hendry (Absolute Immortal Inc.)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
