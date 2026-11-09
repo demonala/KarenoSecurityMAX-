@@ -108,7 +108,7 @@ function executeTool(name, args = {}) {
     if (name === 'read_file') {
       const full = resolveWorkspacePath(args.path);
       if (!fs.existsSync(full)) {
-        console.log(UI.toolTrace('read', args.path, 'NOT FOUND', 'ERR'));
+        console.log(UI.toolStep('read', args.path, 'ERR', 'File not found'));
         return `Error: File not found: ${args.path}`;
       }
       const raw = fs.readFileSync(full, 'utf8');
@@ -116,7 +116,7 @@ function executeTool(name, args = {}) {
       const start = Math.max(1, Number(args.start_line) || 1);
       const end = Math.min(lines.length, Number(args.end_line) || Math.min(lines.length, start + 250));
       const slice = lines.slice(start - 1, end).map((l, idx) => `${start + idx}: ${l}`).join('\n');
-      console.log(UI.toolTrace('read', args.path, `lines ${start}-${end} of ${lines.length} · ${Date.now() - t0}ms`, 'OK'));
+      console.log(UI.toolStep('read', args.path, 'OK', `${start}-${end} of ${lines.length} lines · ${Date.now() - t0}ms`));
       return slice;
     }
 
@@ -129,7 +129,7 @@ function executeTool(name, args = {}) {
       const oldContent = fs.existsSync(full) ? fs.readFileSync(full, 'utf8') : '';
       fs.writeFileSync(full, args.content, 'utf8');
       const linesCount = String(args.content).split('\n').length;
-      console.log(UI.toolTrace('write', args.path, `${linesCount} lines · ${Date.now() - t0}ms`, 'OK'));
+      console.log(UI.toolStep('write', args.path, 'OK', `${linesCount} lines · ${Date.now() - t0}ms`));
       if (oldContent) {
         console.log(UI.renderDiff(args.path, oldContent, args.content));
       }
@@ -139,17 +139,17 @@ function executeTool(name, args = {}) {
     if (name === 'edit_file') {
       const full = resolveWorkspacePath(args.path);
       if (!fs.existsSync(full)) {
-        console.log(UI.toolTrace('edit', args.path, 'NOT FOUND', 'ERR'));
+        console.log(UI.toolStep('edit', args.path, 'ERR', 'File not found'));
         return `Error: File not found: ${args.path}`;
       }
       const oldContent = fs.readFileSync(full, 'utf8');
       if (!oldContent.includes(args.target)) {
-        console.log(UI.toolTrace('edit', args.path, 'TARGET MISMATCH', 'WARN'));
+        console.log(UI.toolStep('edit', args.path, 'WARN', 'Target snippet mismatch'));
         return `Error: Target block not found in ${args.path}. Read the file first to verify exact whitespace.`;
       }
       const newContent = oldContent.replace(args.target, args.replacement);
       fs.writeFileSync(full, newContent, 'utf8');
-      console.log(UI.toolTrace('edit', args.path, `updated · ${Date.now() - t0}ms`, 'OK'));
+      console.log(UI.toolStep('edit', args.path, 'OK', `updated · ${Date.now() - t0}ms`));
       console.log(UI.renderDiff(args.path, args.target, args.replacement));
       return `Successfully edited ${args.path}`;
     }
@@ -164,7 +164,7 @@ function executeTool(name, args = {}) {
         const sz = fs.statSync(path.join(full, d.name)).size;
         return `[FILE] ${d.name} (${sz} B)`;
       });
-      console.log(UI.toolTrace('ls', args.path || '.', `${items.length} entries · ${Date.now() - t0}ms`, 'OK'));
+      console.log(UI.toolStep('list', args.path || '.', 'OK', `${items.length} entries · ${Date.now() - t0}ms`));
       return items.join('\n') || '(empty directory)';
     }
 
@@ -195,7 +195,7 @@ function executeTool(name, args = {}) {
               for (let i = 0; i < lines.length; i++) {
                 if (regex.test(lines[i])) {
                   const rel = path.relative(process.cwd(), p);
-                  results.push(`${rel}:${i + 1}: ${lines[i].trim().slice(0, 120)}`);
+                  results.push(`${rel}:${i + 1}: ${lines[i].trim().slice(0, 100)}`);
                   if (results.length >= 60) break;
                 }
               }
@@ -205,12 +205,12 @@ function executeTool(name, args = {}) {
       }
 
       walk(baseDir);
-      console.log(UI.toolTrace('grep', args.query, `${results.length} matches · ${Date.now() - t0}ms`, 'OK'));
+      console.log(UI.toolStep('grep', args.query, 'OK', `${results.length} matches · ${Date.now() - t0}ms`));
       return results.length > 0 ? results.join('\n') : `No matches found for "${args.query}"`;
     }
 
     if (name === 'run_command') {
-      console.log(UI.toolTrace('exec', args.command, 'running...', 'OK'));
+      console.log(UI.toolStep('exec', args.command, 'RUN', 'running...'));
       try {
         const out = execSync(args.command, {
           cwd: process.cwd(),
@@ -218,8 +218,10 @@ function executeTool(name, args = {}) {
           timeout: 30000,
           maxBuffer: 4 * 1024 * 1024
         });
+        console.log(UI.toolStep('exec', args.command, 'OK', `${Date.now() - t0}ms`));
         return out.trim() || '(command exited with 0 and no output)';
       } catch (err) {
+        console.log(UI.toolStep('exec', args.command, 'ERR', `exit ${err.status || 1}`));
         const stderr = err.stderr ? String(err.stderr).trim() : '';
         const stdout = err.stdout ? String(err.stdout).trim() : '';
         return `Command failed (exit ${err.status || 1}):\n${stdout}\n${stderr}`.trim();

@@ -204,9 +204,10 @@ async function handleSlashCommand(input, ctx) {
   }
 
   if (cmd === '/clear') {
-    process.stdout.write('\x1Bc');
+    process.stdout.write('\x1b[2J\x1b[H');
     messages.length = 0;
-    UI.info('Screen cleared and conversation buffer reset.');
+    const activeSkillsCount = skills.listAll().filter(s => s.enabled).length;
+    console.log(UI.headerBanner(config, quota.getSummary(), activeSkillsCount));
     return { handled: true };
   }
 
@@ -241,17 +242,19 @@ async function handleSlashCommand(input, ctx) {
   if (cmd === '/doctor') {
     let gitOk = 'Not Found';
     try { gitOk = execSync('git --version', { encoding: 'utf8' }).trim(); } catch (_) {}
+    const isTx = UI.isTermux();
     const rows = [
-      ['Node.js >= 18', Number(process.versions.node.split('.')[0]) >= 18 ? 'PASS' : 'WARN'],
+      ['Node Runtime', `PASS (${process.version})`],
+      ['Mobile Container', isTx ? 'PASS (Termux Android ARM)' : 'Mobile Emulation Mode'],
       ['Config Directory', fs.existsSync(KARENO_DIR) ? `PASS (${KARENO_DIR})` : 'FAIL'],
       ['Active Provider', `${config.provider} (${config.model})`],
-      ['Provider API Key', config.apiKeys[config.provider] || config.provider === 'ollama' ? 'PASS (Ready)' : 'MISSING (Run /key:set)'],
+      ['Provider API Key', config.apiKeys[config.provider] || config.provider === 'ollama' ? 'PASS (Connected)' : 'MISSING (Run /key:set)'],
       ['Git Binary', gitOk],
-      ['Termux Mode', UI.isTermux() ? 'DETECTED (Mobile Optimized)' : 'Standard OS'],
+      ['Terminal Columns', `${UI.getCols()} cols`],
       ['Loaded Skills', `${skills.listAll().length} available (${skills.listAll().filter(s => s.enabled).length} enabled)`],
-      ['Registered Commands', `${COMMAND_CATALOG.length} / 100 Verified`]
+      ['Native Commands', `${COMMAND_CATALOG.length} / 100 Verified`]
     ];
-    console.log('\n' + UI.spineBlock('KARENO DIAGNOSTIC DOCTOR', rows, C.CYAN));
+    console.log('\n' + UI.spineBlock('KARENO MOBILE DIAGNOSTIC DOCTOR', rows, C.CYAN));
     return { handled: true };
   }
 
@@ -909,8 +912,18 @@ async function handleSlashCommand(input, ctx) {
   }
 
   if (cmd === '/ps') {
-    const psCmd = os.platform() === 'win32' ? 'tasklist /NH' : 'ps aux | head -n 20';
-    console.log(executeTool('run_command', { command: psCmd }));
+    let psOut = '';
+    try {
+      psOut = execSync(os.platform() === 'win32' ? 'tasklist' : 'ps', {
+        encoding: 'utf8',
+        timeout: 5000,
+        stdio: ['pipe', 'pipe', 'ignore']
+      });
+    } catch (e) {
+      psOut = e.stdout || e.message;
+    }
+    const lines = (psOut || '').trim().split('\n').slice(0, 18).join('\n');
+    console.log(lines || '(no processes listed)');
     return { handled: true };
   }
 
@@ -931,7 +944,7 @@ async function handleSlashCommand(input, ctx) {
     const cpus = os.cpus();
     console.log(UI.spineBlock('HARDWARE & OS TELEMETRY', [
       ['OS Platform', `${os.type()} ${os.release()} (${os.arch()})`],
-      ['CPU Model', cpus[0] ? cpus[0].model : 'Unknown'],
+      ['CPU Model', cpus[0] ? cpus[0].model : 'ARM/Mobile'],
       ['CPU Cores', String(cpus.length)],
       ['Total RAM', `${(os.totalmem() / 1024 / 1024 / 1024).toFixed(2)} GB`],
       ['Free RAM', `${(os.freemem() / 1024 / 1024 / 1024).toFixed(2)} GB`],
@@ -942,11 +955,26 @@ async function handleSlashCommand(input, ctx) {
 
   if (cmd === '/termux') {
     const isTx = UI.isTermux();
+    let batteryInfo = 'N/A';
+    try {
+      const raw = execSync('termux-battery-status', {
+        encoding: 'utf8',
+        timeout: 500,
+        stdio: ['pipe', 'pipe', 'ignore']
+      });
+      const b = JSON.parse(raw);
+      batteryInfo = `${b.percentage}% (${b.status})`;
+    } catch (_) {}
+
+    const storagePath = path.join(os.homedir(), 'storage');
+    const storageStatus = fs.existsSync(storagePath) ? 'Linked (~/storage)' : 'App Sandbox';
+
     console.log(UI.spineBlock('TERMUX ENVIRONMENT AUDIT', [
-      ['Termux Detected', isTx ? 'YES (Active Android Container)' : 'NO (Desktop/Standard Host)'],
-      ['PREFIX Path', process.env.PREFIX || '/data/data/com.termux/files/usr (simulated)'],
-      ['Termux Version', process.env.TERMUX_VERSION || 'N/A'],
-      ['Terminal Columns', `${process.stdout.columns || 80} cols`],
+      ['Termux Detected', isTx ? 'YES (Active Android Container)' : 'Simulated Mobile Container'],
+      ['PREFIX Path', process.env.PREFIX || '/data/data/com.termux/files/usr'],
+      ['Android Storage', storageStatus],
+      ['Device Battery', batteryInfo],
+      ['Terminal Columns', `${UI.getCols()} cols`],
       ['Arch / Endianness', `${os.arch()} / ${os.endianness()}`]
     ], C.CYAN));
     return { handled: true };

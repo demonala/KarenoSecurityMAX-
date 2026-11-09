@@ -13,15 +13,15 @@ const { COMMAND_CATALOG, handleSlashCommand } = require('./commands');
 
 function buildSystemPrompt(config, skills) {
   const parts = [
-    'You are KARENO, an autonomous terminal-native software engineering agent built for Termux and desktop CLI environments.',
-    `Current working directory: ${process.cwd()}`,
-    `Operating system: ${process.platform} (${process.arch})`,
+    'You are KARENO, a tactical autonomous software engineering agent built specifically for mobile Termux and terminal environments.',
+    `Working Directory: ${process.cwd()}`,
+    `Platform: ${process.platform} (${process.arch}) ${UI.isTermux() ? '[Android Termux]' : '[Mobile Emulation]'}`,
     '',
-    'CORE OPERATING DIRECTIVES:',
-    '1. Be concise, direct, and technical. Avoid filler, emojis, and generic disclaimers.',
-    '2. Use tools (read_file, write_file, edit_file, list_dir, grep_code, run_command) to inspect the codebase and verify changes rather than guessing.',
-    '3. Before editing a file, read the relevant lines first so your target block matches exact whitespace.',
-    '4. Conserve token quota by reading targeted line ranges when working with large files.'
+    'MOBILE DIRECTIVES:',
+    '1. Be direct, dense, and technically precise. No fluff, no introductory chit-chat, no emojis.',
+    '2. Format output for narrow mobile screens (keep code blocks clean, avoid excessively wide tables).',
+    '3. Use tools (read_file, write_file, edit_file, list_dir, grep_code, run_command) to inspect and verify before making changes.',
+    '4. Conserve token quota: read targeted line ranges when working with large files.'
   ];
 
   // Load workspace KARENO.md if present
@@ -29,14 +29,14 @@ function buildSystemPrompt(config, skills) {
   if (fs.existsSync(karenoMd)) {
     try {
       const content = fs.readFileSync(karenoMd, 'utf8').slice(0, 8000);
-      parts.push(`\n# WORKSPACE BRIEF (KARENO.md)\n${content}`);
+      parts.push(`\n# WORKSPACE CONTEXT (KARENO.md)\n${content}`);
     } catch (_) {}
   }
 
   // Load persistent memory notes
   if (config.memoryNotes && config.memoryNotes.length > 0) {
     parts.push(
-      `\n# PERSISTENT USER MEMORIES\n` +
+      `\n# PERSISTENT AGENT MEMORIES\n` +
       config.memoryNotes.map((m, i) => `${i + 1}. ${m}`).join('\n')
     );
   }
@@ -48,8 +48,8 @@ function buildSystemPrompt(config, skills) {
       const full = resolveWorkspacePath(relPath);
       if (fs.existsSync(full)) {
         try {
-          const snippet = fs.readFileSync(full, 'utf8').slice(0, 6000);
-          pinnedBlocks.push(`--- PINNED FILE: ${relPath} ---\n${snippet}`);
+          const snippet = fs.readFileSync(full, 'utf8').slice(0, 5000);
+          pinnedBlocks.push(`--- PINNED: ${relPath} ---\n${snippet}`);
         } catch (_) {}
       }
     }
@@ -85,51 +85,60 @@ function createAgentRuntime() {
     messages.push({ role: 'user', content: userPrompt });
     const systemPrompt = buildSystemPrompt(config, skills);
 
-    const maxTurns = 10;
+    const spinner = UI.createSpinner(`Thinking [${config.provider}:${config.model}]...`);
+    spinner.start();
+    const t0 = Date.now();
+    let totalInTok = 0;
+    let totalOutTok = 0;
+    let totalCost = 0.0;
+
+    const maxTurns = 8;
     for (let turn = 0; turn < maxTurns; turn++) {
       const turnGate = quota.checkGate();
       if (!turnGate.allowed) {
-        UI.error(`QUOTA GATE BLOCKED MID-RUN: ${turnGate.reason}`);
+        spinner.stop();
+        UI.error(`QUOTA GATE BLOCKED MID-TASK: ${turnGate.reason}`);
         break;
       }
 
-      process.stdout.write(`${C.GREEN}╟─[KARENO:${config.provider.toUpperCase()}]─▸${C.RESET} ${C.SLATE}reasoning...${C.RESET}\r`);
+      spinner.setLabel(`Reasoning [${config.provider}] (turn ${turn + 1}/${maxTurns})...`);
       let res;
       try {
         res = await callModel(config, systemPrompt, messages, true);
       } catch (err) {
-        process.stdout.write(' '.repeat(60) + '\r');
+        spinner.stop();
         UI.error(`Model API Error: ${err.message}`);
         break;
       }
-      process.stdout.write(' '.repeat(60) + '\r');
 
       const inTok = res.inputTokens || quota.estimateTokens(systemPrompt + JSON.stringify(messages));
       const outTok = res.outputTokens || quota.estimateTokens(res.content);
       const usage = quota.recordUsage(config.provider, inTok, outTok);
+      totalInTok += usage.inputTokens;
+      totalOutTok += usage.outputTokens;
+      totalCost += usage.costUsd;
 
+      // If the model produced final content
       if (res.content && res.content.trim()) {
-        console.log(
-          `\n${C.GREEN}┏━⟦ ${C.BOLD}${C.WHITE}KARENO RESPONSE${C.RESET}${C.GREEN} ⟧━⟦ ${C.SLATE}+${usage.inputTokens + usage.outputTokens} tok · $${usage.costUsd.toFixed(5)}${C.GREEN} ⟧${C.RESET}`
-        );
-        const lines = res.content.trim().split('\n');
-        for (const line of lines) {
-          console.log(`${C.GREEN}┃${C.RESET} ${C.WHITE}${line}${C.RESET}`);
-        }
-        console.log(`${C.GREEN}┗━━▸ END${C.RESET}`);
+        spinner.stop();
+        console.log(`\n${C.GREEN}┏━⟦ ${C.BOLD}${C.WHITE}KARENO${C.RESET} ${C.GREEN}⟧${'━'.repeat(Math.max(10, UI.getCols() - 14))}┓${C.RESET}`);
+        console.log(UI.formatMarkdown(res.content.trim()));
       }
 
+      // If no tool calls, task is finished
       if (!res.toolCalls || res.toolCalls.length === 0) {
         messages.push({ role: 'assistant', content: res.content || '' });
         break;
       }
 
+      // If tool calls, execute them
       messages.push({
         role: 'assistant',
         content: res.content || '',
         tool_calls: res.toolCalls
       });
 
+      spinner.stop();
       for (const tc of res.toolCalls) {
         const fnName = tc.function ? tc.function.name : tc.name;
         let fnArgs = {};
@@ -144,10 +153,24 @@ function createAgentRuntime() {
           role: 'tool',
           tool_call_id: tc.id || `call_${Date.now()}`,
           name: fnName,
-          content: String(toolOutput).slice(0, 12000)
+          content: String(toolOutput).slice(0, 10000)
         });
       }
+
+      spinner.start(`Synthesizing tool results...`);
     }
+
+    spinner.stop();
+    const elapsedSec = ((Date.now() - t0) / 1000).toFixed(1);
+    const qInfo = quota.getSummary();
+    const gauge = UI.quotaGauge(qInfo.dailyPercent, 5);
+
+    console.log(
+      `${C.GREEN}┗━⟦ ${C.BOLD}${C.WHITE}COMPLETE${C.RESET}${C.GREEN} ⟧━⟦ ${C.SLATE}+${totalInTok + totalOutTok} tok · $${totalCost.toFixed(5)} · ${elapsedSec}s · ${gauge} ${qInfo.dailyPercent.toFixed(0)}%${C.GREEN} ⟧${C.RESET}`
+    );
+
+    // Haptic feedback for mobile Termux
+    UI.vibrateMobile(40);
   }
 
   const ctx = {
@@ -166,7 +189,10 @@ function createAgentRuntime() {
     if (trimmed.startsWith('/')) {
       const res = await handleSlashCommand(trimmed, ctx);
       if (!res.handled) {
-        UI.warn(`Unknown command "${trimmed.split(/\s+/)[0]}". Type /help or /commands to list all 100 commands.`);
+        const cmdOnly = trimmed.split(/\s+/)[0];
+        const match = COMMAND_CATALOG.find(c => c.cmd.startsWith(cmdOnly.slice(0, 4)));
+        const suggestion = match ? ` Did you mean ${C.CYAN}${match.cmd}${C.AMBER}?` : '';
+        UI.warn(`Unknown command "${cmdOnly}".${suggestion} Type /help or /commands to list all 100 commands.`);
       }
       return;
     }
@@ -175,6 +201,11 @@ function createAgentRuntime() {
   }
 
   function startRepl() {
+    // Clear screen and set mobile terminal title
+    try {
+      process.stdout.write('\x1b[2J\x1b[H\x1b]0;KARENO // Mobile Tactical Agent\x07');
+    } catch (_) {}
+
     const activeSkillsCount = skills.listAll().filter(s => s.enabled).length;
     console.log(UI.headerBanner(config, quota.getSummary(), activeSkillsCount));
 
@@ -182,8 +213,12 @@ function createAgentRuntime() {
       input: process.stdin,
       output: process.stdout,
       completer: (line) => {
-        const hits = COMMAND_CATALOG.map(c => c.cmd).filter(c => c.startsWith(line));
-        return [hits.length ? hits : [], line];
+        const trimmed = line.trim();
+        if (trimmed.startsWith('/')) {
+          const hits = COMMAND_CATALOG.map(c => c.cmd).filter(c => c.startsWith(trimmed));
+          return [hits.length ? hits : [], line];
+        }
+        return [[], line];
       }
     });
 
