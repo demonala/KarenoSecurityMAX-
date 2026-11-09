@@ -13,12 +13,18 @@ async function main() {
     process.exit(0);
   }
 
+  if (args.includes('--update')) {
+    await runtime.processInput('/update');
+    process.exit(0);
+  }
+
   if (args.includes('--help') || args.includes('-h')) {
     const activeSkillsCount = runtime.skills.listAll().filter(s => s.enabled).length;
     console.log(UI.headerBanner(runtime.config, runtime.quota.getSummary(), activeSkillsCount));
     console.log(UI.spineBlock('CLI LAUNCH OPTIONS', [
       ['kareno', 'Start interactive Kareno tactical REPL'],
-      ['kareno --cmd "/command"', 'Execute any of the 100 slash commands non-interactively'],
+      ['kareno --update', 'Check GitHub and pull latest Kareno update'],
+      ['kareno --cmd "/cmd"', 'Execute any slash command non-interactively'],
       ['kareno --prompt "task"', 'Run an autonomous coding task and exit'],
       ['kareno --version', 'Print version & Node.js runtime info']
     ]));

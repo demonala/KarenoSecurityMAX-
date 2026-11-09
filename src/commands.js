@@ -8,11 +8,13 @@ const { execSync } = require('child_process');
 const UI = require('./ui');
 const { PROVIDERS, saveConfig, KARENO_DIR } = require('./config');
 const { executeTool, resolveWorkspacePath } = require('./tools');
+const updater = require('./updater');
 
 const COMMAND_CATALOG = [
-  // 01. Core Session & System (10)
+  // 01. Core Session & System
   { cmd: '/help', cat: '01. CORE', desc: 'Show categorized command summary or /help <domain>' },
-  { cmd: '/commands', cat: '01. CORE', desc: 'List all 100 native Kareno slash commands' },
+  { cmd: '/commands', cat: '01. CORE', desc: 'List all native Kareno slash commands' },
+  { cmd: '/update', cat: '01. CORE', desc: 'Check GitHub for updates and pull the latest release' },
   { cmd: '/status', cat: '01. CORE', desc: 'Display engine, provider, quota, and workspace telemetry' },
   { cmd: '/clear', cat: '01. CORE', desc: 'Clear terminal screen and reset active conversation buffer' },
   { cmd: '/reset', cat: '01. CORE', desc: 'Reset conversation messages while preserving configuration' },
@@ -220,6 +222,37 @@ async function handleSlashCommand(input, ctx) {
   if (cmd === '/exit' || cmd === '/quit') {
     UI.info('Terminating Kareno session.');
     process.exit(0);
+  }
+
+  if (cmd === '/update') {
+    UI.info('Checking GitHub repository for updates...');
+    const upCheck = await updater.checkForUpdates();
+    if (upCheck.error) {
+      UI.warn(`Could not check updates: ${upCheck.error}`);
+      return { handled: true };
+    }
+    if (!upCheck.hasUpdate) {
+      console.log(UI.spineBlock('KARENO UPDATE STATUS', [
+        ['Status', 'Up to date (latest release)'],
+        ['Current Version', `v${upCheck.currentVersion} (${upCheck.currentCommit || 'HEAD'})`],
+        ['Repository', 'https://github.com/demonala/kareno']
+      ]));
+      return { handled: true };
+    }
+
+    UI.info(`New version available: v${upCheck.latestVersion} (${upCheck.latestCommit || 'latest'}). Updating...`);
+    const res = updater.performUpdate();
+    if (res.success) {
+      console.log(UI.spineBlock('KARENO UPDATED SUCCESSFULLY', [
+        ['Status', 'Updated to latest release'],
+        ['New Version', `v${res.newVersion} (${res.newCommit})`],
+        ['Git Output', res.output.split('\n')[0] || 'Already up to date']
+      ]));
+      UI.info('Restart Kareno to run the updated version.');
+    } else {
+      UI.error(`Update failed: ${res.message}`);
+    }
+    return { handled: true };
   }
 
   if (cmd === '/version') {

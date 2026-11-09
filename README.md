@@ -16,7 +16,7 @@
 
 **KARENO** is an autonomous AI coding agent CLI engineered specifically for **Termux (Android ARM64/AArch64)**.
 
-When you type `kareno` in Termux, it immediately boots into a full interactive mobile terminal UI—just like **OpenCode** and **Claude Code**—with instant `<20ms` cold-start latency, zero heavy runtime dependencies, and an asymmetric tactical interface tailored for narrow mobile phone viewports (45–68 columns).
+When you type `kareno` in Termux, it immediately boots into a full interactive mobile terminal UI (just like **OpenCode** and **Claude Code**) with instant `<20ms` cold-start latency, zero heavy runtime dependencies, and a clean interface tailored for narrow mobile phone viewports (45-68 columns).
 
 ### Core Mobile Architecture
 
@@ -73,14 +73,69 @@ kareno >
 
 ---
 
+## Auto-Update & Upgrading Outdated Versions
+
+KARENO includes a zero-dependency auto-updater that connects directly to the GitHub repository. It ensures you always have the latest fixes, model drivers, and features on your phone without losing your configuration or API keys.
+
+### 1. Automatic Startup Notification
+Every time you launch `kareno`, the engine performs a non-blocking background check against `demonala/kareno` on GitHub. If an update is detected, an alert banner appears:
+```text
+  ▲ Update available: v1.0.1 (a1b2c3d). Run /update to upgrade.
+```
+
+### 2. Updating Inside the Interactive Session
+To pull updates immediately from within your active Kareno session, run:
+```text
+kareno > /update
+```
+Kareno will check GitHub, execute a fast `git pull --rebase origin main`, update symlinks in `$PREFIX/bin`, and confirm when the new version is installed.
+
+### 3. Updating from the Terminal (Shell)
+You can upgrade directly from your Termux shell without entering the REPL:
+```bash
+kareno --update
+```
+
+### 4. Manual Update (If Git Conflicts or Offline)
+If you ever need to manually refresh an outdated installation on your phone:
+```bash
+cd ~/kareno
+git pull origin main
+./install-termux.sh
+```
+
+### 5. Checking Your Installed Version
+To verify the currently active version and Git commit hash:
+```bash
+kareno --version
+```
+Or inside the REPL:
+```text
+kareno > /version
+```
+
+---
+
 ## Connecting Your Model (BYOM)
 
 KARENO is Bring Your Own Model. Set your provider and key once from the interactive prompt:
 
 ```text
+# Example: Setting DeepSeek
 kareno > /provider:set deepseek
 kareno > /key:set sk-your-deepseek-api-key
 kareno > /model:set deepseek-chat
+
+# Example: Setting Google Gemini
+kareno > /provider:set gemini
+kareno > /key:set YOUR_GEMINI_API_KEY
+kareno > /model:set gemini-3.5-flash
+```
+
+Or export environment variables in your `~/.bashrc` or Termux session:
+```bash
+export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+kareno
 ```
 
 ### Supported Providers
@@ -91,7 +146,7 @@ kareno > /model:set deepseek-chat
 | `anthropic` | Anthropic Claude | `claude-3-7-sonnet-latest` | `ANTHROPIC_API_KEY` |
 | `openai` | OpenAI | `gpt-4o` | `OPENAI_API_KEY` |
 | `groq` | Groq Cloud (LPU) | `llama-3.3-70b-versatile` | `GROQ_API_KEY` |
-| `gemini` | Google Gemini | `gemini-2.5-pro` | `GEMINI_API_KEY` |
+| `gemini` | Google Gemini | `gemini-3.5-flash` | `GEMINI_API_KEY` |
 | `openrouter` | OpenRouter | `anthropic/claude-3.7-sonnet` | `OPENROUTER_API_KEY` |
 | `ollama` | Local Ollama (ARM64) | `qwen2.5-coder:7b` | `OLLAMA_API_KEY` |
 
@@ -134,8 +189,8 @@ KARENO ships with 4 bundled core skills:
 
 ## All 100 Native Commands
 
-### 01. Core Session & System (10)
-`/help`, `/commands`, `/status`, `/clear`, `/reset`, `/exit`, `/version`, `/config`, `/doctor`, `/init`
+### 01. Core Session & System
+`/help`, `/commands`, `/update`, `/status`, `/clear`, `/reset`, `/exit`, `/version`, `/config`, `/doctor`, `/init`
 
 ### 02. BYOM Model & Provider Engine (10)
 `/model`, `/model:set`, `/model:list`, `/provider`, `/provider:set`, `/key:set`, `/key:list`, `/key:rm`, `/temp`, `/max-tokens`

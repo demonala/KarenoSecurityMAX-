@@ -10,6 +10,7 @@ const { SkillManager } = require('./skills');
 const { executeTool, resolveWorkspacePath } = require('./tools');
 const { callModel } = require('./providers');
 const { COMMAND_CATALOG, handleSlashCommand } = require('./commands');
+const updater = require('./updater');
 
 function buildSystemPrompt(config, skills) {
   const parts = [
@@ -207,6 +208,13 @@ function createAgentRuntime() {
 
     const activeSkillsCount = skills.listAll().filter(s => s.enabled).length;
     console.log(UI.headerBanner(config, quota.getSummary(), activeSkillsCount));
+
+    // Non-blocking background check for GitHub updates
+    updater.checkForUpdates().then((res) => {
+      if (res && res.hasUpdate) {
+        console.log(`  ${UI.C.AMBER}▲ Update available: v${res.latestVersion} (${res.latestCommit || 'new'}). Run /update to upgrade.${UI.C.RESET}\n`);
+      }
+    }).catch(() => {});
 
     const rl = readline.createInterface({
       input: process.stdin,
