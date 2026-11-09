@@ -331,8 +331,12 @@ async function handleSlashCommand(input, ctx) {
 
   if (cmd === '/model:set') {
     if (!arg1) {
-      UI.warn('Usage: /model:set <model_id> (e.g. /model:set deepseek-reasoner)');
+      UI.warn('Usage: /model:set <model_id> (e.g. /model:set gemini-3.5-flash)');
       return { handled: true };
+    }
+    if (arg1 === 'gemini-3.8-flash') {
+      UI.warn('Notice: Google reports high demand / 503 on gemini-3.8-flash.');
+      UI.info('Recommended stable model is: gemini-3.5-flash');
     }
     config.model = arg1;
     saveConfig(config);

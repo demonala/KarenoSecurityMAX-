@@ -108,7 +108,11 @@ function createAgentRuntime() {
         res = await callModel(config, systemPrompt, messages, true);
       } catch (err) {
         spinner.stop();
-        UI.error(`Model API Error: ${err.message}`);
+        let errMsg = err.message;
+        if (config.provider === 'gemini' && (errMsg.includes('ECONNABORTED') || errMsg.includes('timed out') || errMsg.includes('503'))) {
+          errMsg += '\n  Notice: The model is experiencing high demand on Google servers. Run /model:set gemini-3.5-flash for the fastest stable model.';
+        }
+        UI.error(`Model API Error: ${errMsg}`);
         break;
       }
 
@@ -127,7 +131,11 @@ function createAgentRuntime() {
 
       // If no tool calls, task is finished
       if (!res.toolCalls || res.toolCalls.length === 0) {
-        messages.push({ role: 'assistant', content: res.content || '' });
+        messages.push({
+          role: 'assistant',
+          content: res.content || '',
+          geminiParts: res.geminiParts
+        });
         break;
       }
 
@@ -135,7 +143,8 @@ function createAgentRuntime() {
       messages.push({
         role: 'assistant',
         content: res.content || '',
-        tool_calls: res.toolCalls
+        tool_calls: res.toolCalls,
+        geminiParts: res.geminiParts
       });
 
       spinner.stop();
